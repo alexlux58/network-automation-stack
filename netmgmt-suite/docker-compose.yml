@@ -1,0 +1,341 @@
+
+x-common-env: &common-env
+  TZ: ${TZ}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+
+networks:
+  netmgmt:
+    driver: bridge
+
+volumes:
+  pgdata-netbox: {}
+  netbox-media: {}
+  pgdata-nautobot: {}
+  nautobot-media: {}
+  pgadmin-data: {}
+  oxidized-data: {}
+  jenkins-home: {}
+
+services:
+  postgres-netbox:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${NETBOX_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata-netbox:/var/lib/postgresql/data
+    networks: [netmgmt]
+
+  redis-netbox:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    labels:
+      co.elastic.logs/enabled: "true"
+      co.elastic.logs/module: "redis"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [netmgmt]
+
+  netbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.netbox
+    restart: unless-stopped
+    depends_on:
+      postgres-netbox:
+        condition: service_healthy
+      redis-netbox:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      <<: *common-env
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: ${NETBOX_DB_PASSWORD}
+      DB_HOST: postgres-netbox
+      REDIS_HOST: redis-netbox
+      REDIS_DATABASE: 0
+      REDIS_SSL: "false"
+      SECRET_KEY: ${NETBOX_SECRET_KEY}
+      SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}
+      SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL}
+      SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
+    ports:
+      - "8080:8080"
+    volumes:
+      - netbox-media:/opt/netbox/netbox/media
+    labels:
+      co.elastic.logs/enabled: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login/ >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    networks: [netmgmt]
+
+  netbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.netbox
+    restart: unless-stopped
+    depends_on:
+      netbox:
+        condition: service_started
+    env_file: [.env]
+    environment:
+      <<: *common-env
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: ${NETBOX_DB_PASSWORD}
+      DB_HOST: postgres-netbox
+      REDIS_HOST: redis-netbox
+      REDIS_DATABASE: 0
+      REDIS_SSL: "false"
+      SECRET_KEY: ${NETBOX_SECRET_KEY}
+    command: ["python", "/opt/netbox/netbox/manage.py", "rqworker"]
+    labels:
+      co.elastic.logs/enabled: "true"
+    networks: [netmgmt]
+
+  netbox-housekeeping:
+    build:
+      context: .
+      dockerfile: Dockerfile.netbox
+    restart: unless-stopped
+    depends_on:
+      netbox:
+        condition: service_started
+    env_file: [.env]
+    environment:
+      <<: *common-env
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: ${NETBOX_DB_PASSWORD}
+      DB_HOST: postgres-netbox
+      REDIS_HOST: redis-netbox
+      REDIS_DATABASE: 0
+      REDIS_SSL: "false"
+      SECRET_KEY: ${NETBOX_SECRET_KEY}
+    command: ["python", "/opt/netbox/netbox/manage.py", "housekeeping"]
+    labels:
+      co.elastic.logs/enabled: "true"
+    networks: [netmgmt]
+
+  postgres-nautobot:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nautobot
+      POSTGRES_USER: nautobot
+      POSTGRES_PASSWORD: ${NAUTOBOT_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nautobot -d nautobot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata-nautobot:/var/lib/postgresql/data
+    networks: [netmgmt]
+
+  redis-nautobot:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    labels:
+      co.elastic.logs/enabled: "true"
+      co.elastic.logs/module: "redis"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [netmgmt]
+
+  nautobot:
+    build:
+      context: .
+      dockerfile: Dockerfile.nautobot
+    restart: unless-stopped
+    depends_on:
+      postgres-nautobot:
+        condition: service_healthy
+      redis-nautobot:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      <<: *common-env
+      NAUTOBOT_DB_ENGINE: django.db.backends.postgresql
+      NAUTOBOT_DB_HOST: postgres-nautobot
+      NAUTOBOT_DB_NAME: nautobot
+      NAUTOBOT_DB_USER: nautobot
+      NAUTOBOT_DB_PASSWORD: ${NAUTOBOT_DB_PASSWORD}
+      NAUTOBOT_REDIS_HOST: redis-nautobot
+      NAUTOBOT_REDIS_PORT: 6379
+      NAUTOBOT_REDIS_DATABASE: 0
+      NAUTOBOT_SECRET_KEY: ${NAUTOBOT_SECRET_KEY}
+    ports:
+      - "8081:8080"
+    volumes:
+      - nautobot-media:/opt/nautobot/media
+    labels:
+      co.elastic.logs/enabled: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login/ >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    networks: [netmgmt]
+
+  nautobot-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.nautobot
+    restart: unless-stopped
+    depends_on:
+      nautobot:
+        condition: service_started
+    env_file: [.env]
+    environment:
+      <<: *common-env
+      NAUTOBOT_DB_ENGINE: django.db.backends.postgresql
+      NAUTOBOT_DB_HOST: postgres-nautobot
+      NAUTOBOT_DB_NAME: nautobot
+      NAUTOBOT_DB_USER: nautobot
+      NAUTOBOT_DB_PASSWORD: ${NAUTOBOT_DB_PASSWORD}
+      NAUTOBOT_REDIS_HOST: redis-nautobot
+      NAUTOBOT_REDIS_PORT: 6379
+      NAUTOBOT_REDIS_DATABASE: 0
+      NAUTOBOT_SECRET_KEY: ${NAUTOBOT_SECRET_KEY}
+    command: ["nautobot-server", "rqworker"]
+    labels:
+      co.elastic.logs/enabled: "true"
+    networks: [netmgmt]
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    depends_on:
+      - postgres-netbox
+      - postgres-nautobot
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks: [netmgmt]
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: "netbox:redis-netbox:6379,nautobot:redis-nautobot:6379"
+    ports:
+      - "8082:8081"
+    networks: [netmgmt]
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+    networks: [netmgmt]
+    labels:
+      co.elastic.logs/enabled: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/prometheus"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  oxidized:
+    image: oxidized/oxidized:latest
+    restart: unless-stopped
+    environment:
+      CONFIG_RELOAD_INTERVAL: "600"
+    volumes:
+      - oxidized-data:/home/oxidized/.config/oxidized
+    ports:
+      - "8888:8888"
+    networks: [netmgmt]
+    labels:
+      co.elastic.logs/enabled: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8888"
+      prometheus.io/path: "/metrics"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.0
+    restart: unless-stopped
+    user: root
+    depends_on:
+      - netbox
+      - nautobot
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./beats/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    networks: [netmgmt]

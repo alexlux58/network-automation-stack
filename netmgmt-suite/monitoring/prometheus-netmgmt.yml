@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'netmgmt-netbox'
+    static_configs:
+      - targets: ['netbox:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-nautobot'
+    static_configs:
+      - targets: ['nautobot:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-jenkins'
+    static_configs:
+      - targets: ['jenkins:8080']
+    metrics_path: '/prometheus'
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-oxidized'
+    static_configs:
+      - targets: ['oxidized:8888']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-postgres-netbox'
+    static_configs:
+      - targets: ['postgres-netbox:5432']
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-postgres-nautobot'
+    static_configs:
+      - targets: ['postgres-nautobot:5432']
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-redis-netbox'
+    static_configs:
+      - targets: ['redis-netbox:6379']
+    scrape_interval: 30s
+
+  - job_name: 'netmgmt-redis-nautobot'
+    static_configs:
+      - targets: ['redis-nautobot:6379']
+    scrape_interval: 30s

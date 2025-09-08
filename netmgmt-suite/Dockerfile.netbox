@@ -1,0 +1,3 @@
+FROM netboxcommunity/netbox:latest
+# Use base NetBox image without additional plugins for now
+# Plugins can be installed later via the web interface or requirements.txt

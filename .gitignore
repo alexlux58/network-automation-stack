@@ -1,0 +1,268 @@
+# Network Automation Stack .gitignore
+
+# ===========================================
+# Environment and Configuration Files
+# ===========================================
+.env
+.env.local
+.env.*.local
+*.env
+secrets/
+credentials/
+config/secrets/
+
+# ===========================================
+# Docker and Container Files
+# ===========================================
+# Docker volumes and data
+docker-data/
+postgres-data/
+redis-data/
+netbox-data/
+nautobot-data/
+jenkins-data/
+oxidized-data/
+pgadmin-data/
+
+# Docker build cache
+.dockerignore
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+
+# ===========================================
+# Logs and Temporary Files
+# ===========================================
+*.log
+logs/
+log/
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# ===========================================
+# Database Files
+# ===========================================
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+
+# ===========================================
+# Backup Files
+# ===========================================
+backups/
+*.backup
+*.bak
+*.tar.gz
+*.zip
+
+# ===========================================
+# Python Files
+# ===========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# ===========================================
+# IDE and Editor Files
+# ===========================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ===========================================
+# OS Generated Files
+# ===========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===========================================
+# Network Device Configurations
+# ===========================================
+# Device configs (may contain sensitive info)
+device-configs/
+configs/
+*.conf
+*.cfg
+!example.conf
+!template.conf
+
+# ===========================================
+# Monitoring and Observability
+# ===========================================
+# Prometheus data
+prometheus-data/
+grafana-data/
+alertmanager-data/
+
+# Elasticsearch data
+elasticsearch-data/
+kibana-data/
+
+# ===========================================
+# SSL/TLS Certificates
+# ===========================================
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+ssl/
+certs/
+certificates/
+
+# ===========================================
+# Jenkins
+# ===========================================
+jenkins-home/
+.jenkins/
+workspace/
+
+# ===========================================
+# Oxidized
+# ===========================================
+oxidized-home/
+.rrd/
+
+# ===========================================
+# NetBox/Naubot Specific
+# ===========================================
+# Media files
+media/
+static/
+staticfiles/
+
+# Redis dumps
+dump.rdb
+
+# ===========================================
+# Build and Compilation
+# ===========================================
+# Node.js (if using any frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===========================================
+# Documentation Build
+# ===========================================
+docs/_build/
+site/
+
+# ===========================================
+# Testing
+# ===========================================
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ===========================================
+# Jupyter Notebook
+# ===========================================
+.ipynb_checkpoints
+
+# ===========================================
+# Custom Project Files
+# ===========================================
+# Add any project-specific files to ignore here
+local-settings/
+custom-configs/
+user-data/
