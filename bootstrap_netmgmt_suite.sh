@@ -25,7 +25,6 @@ volumes:
   pgdata-nautobot: {}
   nautobot-media: {}
   pgadmin-data: {}
-  oxidized-data: {}
   jenkins-home: {}
 
 services:
@@ -251,7 +250,7 @@ services:
       NAUTOBOT_REDIS_PORT: 6379
       NAUTOBOT_REDIS_DATABASE: 0
       NAUTOBOT_SECRET_KEY: ${NAUTOBOT_SECRET_KEY}
-    command: ["nautobot-server", "rqworker"]
+    command: ["nautobot-server", "celery", "worker"]
     labels:
       co.elastic.logs/enabled: "true"
     networks: [netmgmt]
@@ -309,48 +308,7 @@ services:
           memory: 1G
           cpus: '0.5'
 
-  oxidized:
-    image: oxidized/oxidized:latest
-    restart: unless-stopped
-    environment:
-      CONFIG_RELOAD_INTERVAL: "600"
-    volumes:
-      - oxidized-data:/home/oxidized/.config/oxidized
-    ports:
-      - "8888:8888"
-    networks: [netmgmt]
-    labels:
-      co.elastic.logs/enabled: "true"
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-      prometheus.io/path: "/metrics"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8888 >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
 
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:8.15.0
-    restart: unless-stopped
-    user: root
-    depends_on:
-      - netbox
-      - nautobot
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./beats/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-    networks: [netmgmt]
 YML
 
 # ---------------- Dockerfile.netbox ----------------
@@ -474,11 +432,6 @@ scrape_configs:
     metrics_path: '/prometheus'
     scrape_interval: 30s
 
-  - job_name: 'netmgmt-oxidized'
-    static_configs:
-      - targets: ['oxidized:8888']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
 
   - job_name: 'netmgmt-postgres-netbox'
     static_configs:
@@ -577,16 +530,8 @@ PY
 echo "Generating secure secret keys..."
 python3 "$ROOT/scripts/gen_secrets.py" "$ROOT/.env"
 
-# Fix Oxidized configuration
-echo "Setting up Oxidized configuration..."
-echo "192.168.1.1:ios:admin:password" > "$ROOT/oxidized/config/router.db"
-
-# Fix Filebeat configuration
-echo "Fixing Filebeat configuration..."
-sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$ROOT/beats/filebeat/filebeat.yml"
-
-# Fix file ownership for Filebeat (will be done on the VM)
-echo "Note: Run 'sudo chown 0:0 beats/filebeat/filebeat.yml' on the VM after deployment"
+# Note: Oxidized and Filebeat removed to simplify deployment
+echo "Oxidized and Filebeat removed for simplified deployment"
 
 chmod +x "$ROOT/scripts/gen_secrets.py"
 
@@ -830,42 +775,85 @@ apply_critical_fixes() {
         exit 1
     fi
     
-    # Fix Oxidized configuration
-    if [ -f "$work_dir/oxidized/config/router.db" ]; then
-        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
-        log_success "Fixed Oxidized router.db configuration"
-    else
-        log_warning "Oxidized router.db not found, creating it..."
-        mkdir -p "$work_dir/oxidized/config"
-        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
-        log_success "Created Oxidized router.db configuration"
-    fi
-    
-    # Fix Filebeat configuration
-    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
-        sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$work_dir/beats/filebeat/filebeat.yml"
-        log_success "Fixed Filebeat logstash hosts configuration"
-    else
-        log_warning "Filebeat configuration not found"
-    fi
-    
-    # Fix file ownership for Filebeat (if running as root)
-    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ] && [ "$(id -u)" -eq 0 ]; then
-        chown 0:0 "$work_dir/beats/filebeat/filebeat.yml"
-        log_success "Fixed Filebeat file ownership"
-    elif [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
-        log_info "Note: Run 'sudo chown 0:0 beats/filebeat/filebeat.yml' to fix file ownership"
-    fi
-    
-    # Copy Oxidized config to container if it's running
-    if (cd "$work_dir" && docker compose ps oxidized | grep -q "Up"); then
-        log_info "Copying Oxidized configuration to running container..."
-        (cd "$work_dir" && docker cp oxidized/config/router.db netmgmt-suite_oxidized_1:/home/oxidized/.config/oxidized/router.db 2>/dev/null || true)
-        (cd "$work_dir" && docker compose restart oxidized 2>/dev/null || true)
-        log_success "Oxidized configuration updated in container"
-    fi
+    # Note: Oxidized and Filebeat removed for simplified deployment
+    log_info "Oxidized and Filebeat services removed for simplified deployment"
     
     log_success "Critical fixes applied successfully"
+}
+
+step_by_step_deployment() {
+    log_info "Starting step-by-step deployment to isolate issues..."
+    
+    local work_dir=$(get_work_dir)
+    if [ -z "$work_dir" ]; then
+        log_error "Cannot find docker-compose.yml file"
+        exit 1
+    fi
+    
+    cd "$work_dir"
+    
+    # Step 1: Start databases first
+    log_info "Step 1: Starting databases..."
+    docker compose up -d postgres-netbox postgres-nautobot redis-netbox redis-nautobot
+    
+    log_info "Waiting for databases to be healthy..."
+    sleep 10
+    
+    # Check database health
+    if docker compose ps postgres-netbox | grep -q "healthy" && docker compose ps postgres-nautobot | grep -q "healthy"; then
+        log_success "Databases are healthy"
+    else
+        log_error "Database health check failed"
+        docker compose logs postgres-netbox postgres-nautobot
+        exit 1
+    fi
+    
+    # Step 2: Start NetBox
+    log_info "Step 2: Starting NetBox..."
+    docker compose up -d netbox netbox-worker netbox-housekeeping
+    
+    log_info "Waiting for NetBox to be healthy..."
+    sleep 30
+    
+    # Check NetBox health
+    if docker compose ps netbox | grep -q "healthy"; then
+        log_success "NetBox is healthy"
+    else
+        log_error "NetBox health check failed"
+        docker compose logs netbox
+        exit 1
+    fi
+    
+    # Step 3: Start Nautobot
+    log_info "Step 3: Starting Nautobot..."
+    docker compose up -d nautobot nautobot-worker
+    
+    log_info "Waiting for Nautobot to be healthy..."
+    sleep 30
+    
+    # Check Nautobot health
+    if docker compose ps nautobot | grep -q "healthy"; then
+        log_success "Nautobot is healthy"
+    else
+        log_error "Nautobot health check failed"
+        docker compose logs nautobot
+        exit 1
+    fi
+    
+    # Step 4: Start remaining services
+    log_info "Step 4: Starting remaining services..."
+    docker compose up -d pgadmin redis-commander jenkins
+    
+    log_info "Waiting for remaining services..."
+    sleep 20
+    
+    # Final status check
+    log_info "Final status check..."
+    docker compose ps
+    
+    log_success "Step-by-step deployment completed!"
+    log_info "Check individual service logs if any issues:"
+    log_info "  docker compose logs <service-name>"
 }
 
 start_services() {
@@ -893,23 +881,8 @@ start_services() {
     # Apply critical fixes before starting services
     log_info "Applying critical configuration fixes..."
     
-    # Fix Oxidized configuration
-    if [ -f "$work_dir/oxidized/config/router.db" ]; then
-        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
-        log_success "Fixed Oxidized router.db configuration"
-    fi
-    
-    # Fix Filebeat configuration
-    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
-        sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$work_dir/beats/filebeat/filebeat.yml"
-        log_success "Fixed Filebeat logstash hosts configuration"
-    fi
-    
-    # Fix file ownership for Filebeat (if running as root)
-    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ] && [ "$(id -u)" -eq 0 ]; then
-        chown 0:0 "$work_dir/beats/filebeat/filebeat.yml"
-        log_success "Fixed Filebeat file ownership"
-    fi
+    # Note: Oxidized and Filebeat removed for simplified deployment
+    log_info "Oxidized and Filebeat services removed for simplified deployment"
     
     # Start services
     log_info "Building and starting services (this may take several minutes)..."
@@ -978,7 +951,6 @@ show_status() {
     echo "NetBox:    http://localhost:8080/"
     echo "Nautobot:  http://localhost:8081/"
     echo "Jenkins:   http://localhost:8090/"
-    echo "Oxidized:  http://localhost:8888/"
     echo "pgAdmin:   http://localhost:5050/"
     echo "Redis Cmd: http://localhost:8082/"
     
@@ -987,7 +959,6 @@ show_status() {
     echo "NetBox:    http://$DEPLOYMENT_IP:8080/"
     echo "Nautobot:  http://$DEPLOYMENT_IP:8081/"
     echo "Jenkins:   http://$DEPLOYMENT_IP:8090/"
-    echo "Oxidized:  http://$DEPLOYMENT_IP:8888/"
     echo "pgAdmin:   http://$DEPLOYMENT_IP:5050/"
     echo "Redis Cmd: http://$DEPLOYMENT_IP:8082/"
     
@@ -1081,6 +1052,7 @@ COMMANDS:
     status          Show service status and URLs
     logs            Show live logs from all services
     fix             Apply critical configuration fixes
+    step-deploy     Deploy services step-by-step to isolate issues
     backup          Create backup of databases and volumes
     destroy         Destroy project and all data (DESTRUCTIVE!)
     help            Show this help message
@@ -1159,6 +1131,13 @@ main() {
                 exit 1
             fi
             apply_critical_fixes
+            ;;
+        step-deploy)
+            if [ ! -f "docker-compose.yml" ] && [ ! -f "../docker-compose.yml" ]; then
+                log_error "Project not found. Run '$0 bootstrap' first."
+                exit 1
+            fi
+            step_by_step_deployment
             ;;
         backup)
             if [ ! -f "docker-compose.yml" ] && [ ! -f "../docker-compose.yml" ]; then
@@ -1261,9 +1240,9 @@ bootstrap: ## Create superusers (idempotent)
 
 urls: ## Print URLs
 	@echo -e "\nLocal Access:"
-	@echo -e "NetBox:    http://localhost:8080/\nNautobot:  http://localhost:8081/\npgAdmin:   http://localhost:5050/\nRedis Cmd: http://localhost:8082/\nJenkins:   http://localhost:8090/\nOxidized:  http://localhost:8888/\n"
+	@echo -e "NetBox:    http://localhost:8080/\nNautobot:  http://localhost:8081/\npgAdmin:   http://localhost:5050/\nRedis Cmd: http://localhost:8082/\nJenkins:   http://localhost:8090/\n"
 	@echo -e "LAN Access (192.168.5.9):"
-	@echo -e "NetBox:    http://192.168.5.9:8080/\nNautobot:  http://192.168.5.9:8081/\npgAdmin:   http://192.168.5.9:5050/\nRedis Cmd: http://192.168.5.9:8082/\nJenkins:   http://192.168.5.9:8090/\nOxidized:  http://192.168.5.9:8888/\n"
+	@echo -e "NetBox:    http://192.168.5.9:8080/\nNautobot:  http://192.168.5.9:8081/\npgAdmin:   http://192.168.5.9:5050/\nRedis Cmd: http://192.168.5.9:8082/\nJenkins:   http://192.168.5.9:8090/\n"
 	@echo -e "Observability Stack Integration:"
 	@echo -e "Elasticsearch: http://192.168.5.13:9200/\nKibana:        http://192.168.5.13:5601/\nGrafana:       http://192.168.5.13:3000/\nPrometheus:    http://192.168.5.13:9090/\nAlertmanager:  http://192.168.5.13:9093/\n"
 	@echo -e "Prometheus Config: ./monitoring/prometheus-netmgmt.yml"
@@ -1353,7 +1332,6 @@ make urls
 | **NetBox** | 8080 | http://localhost:8080/ | http://192.168.5.9:8080/ | IPAM/DCIM | admin / GenerateStrongPassword123! |
 | **Nautobot** | 8081 | http://localhost:8081/ | http://192.168.5.9:8081/ | Network Automation | admin / GenerateStrongPassword123! |
 | **Jenkins** | 8090 | http://localhost:8090/ | http://192.168.5.9:8090/ | CI/CD Pipeline | (Initial setup required) |
-| **Oxidized** | 8888 | http://localhost:8888/ | http://192.168.5.9:8888/ | Config Backup | (Web interface) |
 | **pgAdmin** | 5050 | http://localhost:5050/ | http://192.168.5.9:5050/ | Database Admin | admin@example.com / GenerateStrongPassword123! |
 | **Redis Commander** | 8082 | http://localhost:8082/ | http://192.168.5.9:8082/ | Redis Management | (No auth) |
 
@@ -1575,7 +1553,6 @@ docker compose ps
 - [NetBox Documentation](https://docs.netbox.dev/)
 - [Nautobot Documentation](https://docs.nautobot.com/)
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
-- [Oxidized Documentation](https://github.com/ytti/oxidized)
 
 ### Plugins & Extensions
 - **NetBox Plugins**: Topology views, BGP, Onboarding

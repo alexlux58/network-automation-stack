@@ -13,14 +13,12 @@ A comprehensive network management and automation platform that integrates **Net
 | **Jenkins** | http://192.168.5.9:8090/ | ✅ Working | 3GB | CI/CD Pipelines |
 | **pgAdmin** | http://192.168.5.9:5050/ | ✅ Working | 2GB | Database Management |
 | **Redis Commander** | http://192.168.5.9:8082/ | ✅ Working | 1GB | Redis Management |
-| **Oxidized** | http://192.168.5.9:8888/ | ✅ Working | 1GB | Config Backup |
 
 **🔧 Recent Fixes Applied:**
 - ✅ **Memory Optimization**: Configured proper memory limits for 10GB+ systems
 - ✅ **Jenkins Memory**: Increased to 3GB limit for stable operation
 - ✅ **Service Memory**: Set 2GB limits for NetBox, Nautobot, pgAdmin
-- ✅ **Oxidized Configuration**: Fixed device loading and configuration issues
-- ✅ **Filebeat Ownership**: Resolved config file ownership problems
+- ✅ **Service Simplification**: Removed Oxidized and Filebeat for stable deployment
 - ✅ **ALLOWED_HOSTS**: Fixed Django host configuration issues
 - ✅ **Resource Management**: Optimized for production workloads
 
@@ -935,23 +933,29 @@ docker restart netmgmt-suite_netbox_1 netmgmt-suite_nautobot_1
 ```bash
 # Use the built-in fix command to resolve common issues
 ./scripts/netmgmt.sh fix
+```
 
-# This will automatically fix:
-# - Oxidized router.db configuration
-# - Filebeat logstash hosts configuration
-# - Filebeat file ownership (if running as root)
-# - Copy configurations to running containers
+#### Step-by-Step Deployment for Troubleshooting
+```bash
+# Deploy services one by one to isolate issues
+./scripts/netmgmt.sh step-deploy
+
+# This will:
+# 1. Start databases first (PostgreSQL, Redis)
+# 2. Start NetBox and wait for health check
+# 3. Start Nautobot and wait for health check  
+# 4. Start remaining services (pgAdmin, Redis Commander, Jenkins)
+# 5. Show final status and any issues
 ```
 
 ### 🎉 **Success Criteria**
 
 Your deployment is successful when:
-- [x] All 6 services show "Up" status in `./scripts/netmgmt.sh status`
+- [x] All 5 services show "Up" status in `./scripts/netmgmt.sh status`
 - [x] NetBox and Nautobot show HTTP 200 (setup/login pages accessible)
 - [x] Jenkins shows HTTP 200 (setup wizard accessible)
 - [x] pgAdmin shows HTTP 200 (login page accessible)
 - [x] Redis Commander shows HTTP 200 (fully functional)
-- [x] Oxidized shows HTTP 200 (REST API accessible)
 - [x] All web interfaces are accessible via browser
 - [x] No critical errors in logs
 - [x] Database connections are healthy

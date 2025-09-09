@@ -9,8 +9,9 @@ filebeat.inputs:
         match_pids: ["process.pid"]
 
 output.logstash:
-  hosts: ["${LOGSTASH_HOST}:${LOGSTASH_PORT}"]
+  hosts: ["192.168.5.13:5044"]
 
 processors:
   - add_host_metadata:
       when.not.contains.tags: forwarded
+
