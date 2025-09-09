@@ -260,6 +260,14 @@ services:
     ports:
       - "5050:80"
     networks: [netmgmt]
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -320,6 +328,10 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
     deploy:
       resources:
         limits:

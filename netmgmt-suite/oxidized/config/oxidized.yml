@@ -1,6 +1,6 @@
 ---
 username: admin
-password: admin
+password: password
 model: junos
 interval: 3600
 log: /home/oxidized/.config/oxidized/logs
@@ -16,6 +16,8 @@ next_adds_job: false
 vars: {}
 groups: {}
 models: {}
+resolve_dns: false
+pid: "/home/oxidized/.config/oxidized/oxidized.pid"
 input:
   default: ssh, telnet
   debug: false
