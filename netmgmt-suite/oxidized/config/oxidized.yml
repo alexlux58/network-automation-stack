@@ -1,0 +1,38 @@
+---
+username: admin
+password: admin
+model: junos
+interval: 3600
+log: /home/oxidized/.config/oxidized/logs
+pid: /home/oxidized/.config/oxidized/oxidized.pid
+use_syslog: false
+debug: false
+threads: 30
+timeout: 20
+retries: 3
+prompt: !ruby/regexp /^([\w.@-]+[#>]\s?)$/
+rest: 0.0.0.0:8888
+next_adds_job: false
+vars: {}
+groups: {}
+models: {}
+input:
+  default: ssh, telnet
+  debug: false
+  ssh:
+    secure: false
+output:
+  default: file
+  file:
+    directory: /home/oxidized/.config/oxidized/configs
+source:
+  default: csv
+  csv:
+    file: /home/oxidized/.config/oxidized/router.db
+    delimiter: !ruby/regexp /:/
+    map:
+      name: 0
+      model: 1
+      username: 2
+      password: 3
+    gpg: false
