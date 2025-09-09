@@ -178,6 +178,7 @@ services:
       context: .
       dockerfile: Dockerfile.nautobot
     restart: unless-stopped
+    user: root
     depends_on:
       postgres-nautobot:
         condition: service_healthy
@@ -224,6 +225,7 @@ services:
       context: .
       dockerfile: Dockerfile.nautobot
     restart: unless-stopped
+    user: root
     depends_on:
       nautobot:
         condition: service_started
@@ -337,5 +339,5 @@ services:
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./beats/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./beats/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
     networks: [netmgmt]
