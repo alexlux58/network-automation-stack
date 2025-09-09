@@ -572,6 +572,22 @@ for key in ("NETBOX_SECRET_KEY","NAUTOBOT_SECRET_KEY"):
 open(path,"w",encoding="utf-8").write(content)
 print("Secrets generated/updated in .env")
 PY
+
+# Generate secure secret keys immediately after creating .env
+echo "Generating secure secret keys..."
+python3 "$ROOT/scripts/gen_secrets.py" "$ROOT/.env"
+
+# Fix Oxidized configuration
+echo "Setting up Oxidized configuration..."
+echo "192.168.1.1:ios:admin:password" > "$ROOT/oxidized/config/router.db"
+
+# Fix Filebeat configuration
+echo "Fixing Filebeat configuration..."
+sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$ROOT/beats/filebeat/filebeat.yml"
+
+# Fix file ownership for Filebeat (will be done on the VM)
+echo "Note: Run 'sudo chown 0:0 beats/filebeat/filebeat.yml' on the VM after deployment"
+
 chmod +x "$ROOT/scripts/gen_secrets.py"
 
 # ---------------- scripts/netmgmt.sh ----------------
@@ -805,6 +821,53 @@ generate_secrets() {
     fi
 }
 
+apply_critical_fixes() {
+    log_info "Applying critical configuration fixes..."
+    
+    local work_dir=$(get_work_dir)
+    if [ -z "$work_dir" ]; then
+        log_error "Cannot find docker-compose.yml file"
+        exit 1
+    fi
+    
+    # Fix Oxidized configuration
+    if [ -f "$work_dir/oxidized/config/router.db" ]; then
+        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
+        log_success "Fixed Oxidized router.db configuration"
+    else
+        log_warning "Oxidized router.db not found, creating it..."
+        mkdir -p "$work_dir/oxidized/config"
+        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
+        log_success "Created Oxidized router.db configuration"
+    fi
+    
+    # Fix Filebeat configuration
+    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
+        sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$work_dir/beats/filebeat/filebeat.yml"
+        log_success "Fixed Filebeat logstash hosts configuration"
+    else
+        log_warning "Filebeat configuration not found"
+    fi
+    
+    # Fix file ownership for Filebeat (if running as root)
+    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ] && [ "$(id -u)" -eq 0 ]; then
+        chown 0:0 "$work_dir/beats/filebeat/filebeat.yml"
+        log_success "Fixed Filebeat file ownership"
+    elif [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
+        log_info "Note: Run 'sudo chown 0:0 beats/filebeat/filebeat.yml' to fix file ownership"
+    fi
+    
+    # Copy Oxidized config to container if it's running
+    if (cd "$work_dir" && docker compose ps oxidized | grep -q "Up"); then
+        log_info "Copying Oxidized configuration to running container..."
+        (cd "$work_dir" && docker cp oxidized/config/router.db netmgmt-suite_oxidized_1:/home/oxidized/.config/oxidized/router.db 2>/dev/null || true)
+        (cd "$work_dir" && docker compose restart oxidized 2>/dev/null || true)
+        log_success "Oxidized configuration updated in container"
+    fi
+    
+    log_success "Critical fixes applied successfully"
+}
+
 start_services() {
     log_info "Starting network management suite services..."
     
@@ -825,6 +888,27 @@ start_services() {
         else
             log_info "Starting additional services..."
         fi
+    fi
+    
+    # Apply critical fixes before starting services
+    log_info "Applying critical configuration fixes..."
+    
+    # Fix Oxidized configuration
+    if [ -f "$work_dir/oxidized/config/router.db" ]; then
+        echo "192.168.1.1:ios:admin:password" > "$work_dir/oxidized/config/router.db"
+        log_success "Fixed Oxidized router.db configuration"
+    fi
+    
+    # Fix Filebeat configuration
+    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ]; then
+        sed -i.bak 's|hosts: \["\${LOGSTASH_HOST}:\${LOGSTASH_PORT}"\]|hosts: ["192.168.5.13:5044"]|' "$work_dir/beats/filebeat/filebeat.yml"
+        log_success "Fixed Filebeat logstash hosts configuration"
+    fi
+    
+    # Fix file ownership for Filebeat (if running as root)
+    if [ -f "$work_dir/beats/filebeat/filebeat.yml" ] && [ "$(id -u)" -eq 0 ]; then
+        chown 0:0 "$work_dir/beats/filebeat/filebeat.yml"
+        log_success "Fixed Filebeat file ownership"
     fi
     
     # Start services
@@ -996,6 +1080,7 @@ COMMANDS:
     restart         Restart all services
     status          Show service status and URLs
     logs            Show live logs from all services
+    fix             Apply critical configuration fixes
     backup          Create backup of databases and volumes
     destroy         Destroy project and all data (DESTRUCTIVE!)
     help            Show this help message
@@ -1067,6 +1152,13 @@ main() {
                 exit 1
             fi
             show_logs
+            ;;
+        fix)
+            if [ ! -f "docker-compose.yml" ] && [ ! -f "../docker-compose.yml" ]; then
+                log_error "Project not found. Run '$0 bootstrap' first."
+                exit 1
+            fi
+            apply_critical_fixes
             ;;
         backup)
             if [ ! -f "docker-compose.yml" ] && [ ! -f "../docker-compose.yml" ]; then

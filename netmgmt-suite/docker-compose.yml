@@ -88,10 +88,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 2G
           cpus: '0.5'
         reservations:
-          memory: 128M
+          memory: 1G
           cpus: '0.25'
     networks: [netmgmt]
 
@@ -213,10 +213,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 2G
           cpus: '0.5'
         reservations:
-          memory: 128M
+          memory: 1G
           cpus: '0.25'
     networks: [netmgmt]
 
@@ -263,10 +263,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 2G
           cpus: '1.0'
         reservations:
-          memory: 128M
+          memory: 1G
           cpus: '0.5'
 
   redis-commander:
@@ -294,17 +294,13 @@ services:
       prometheus.io/path: "/prometheus"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 3G
           cpus: '1.0'
         reservations:
-          memory: 256M
+          memory: 1G
           cpus: '0.5'
 
   oxidized:
@@ -335,7 +331,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 1G
           cpus: '0.5'
         reservations:
           memory: 256M
