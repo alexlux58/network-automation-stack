@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 PROJECT_NAME="netmgmt-suite"
 DEPLOYMENT_IP="192.168.5.9"
 OBSERVABILITY_IP="192.168.5.13"
-REQUIRED_PORTS=(8080 8081 8090 8888 5050 8082)
+REQUIRED_PORTS=(8080 8081)
 
 # Helper functions
 log_info() {
@@ -315,27 +315,14 @@ show_status() {
     log_info "Service URLs (Local Access):"
     echo "NetBox:    http://localhost:8080/"
     echo "Nautobot:  http://localhost:8081/"
-    echo "Jenkins:   http://localhost:8090/"
-    echo "Oxidized:  http://localhost:8888/"
-    echo "pgAdmin:   http://localhost:5050/"
-    echo "Redis Cmd: http://localhost:8082/"
     
     echo
     log_info "Service URLs (LAN Access):"
     echo "NetBox:    http://$DEPLOYMENT_IP:8080/"
     echo "Nautobot:  http://$DEPLOYMENT_IP:8081/"
-    echo "Jenkins:   http://$DEPLOYMENT_IP:8090/"
-    echo "Oxidized:  http://$DEPLOYMENT_IP:8888/"
-    echo "pgAdmin:   http://$DEPLOYMENT_IP:5050/"
-    echo "Redis Cmd: http://$DEPLOYMENT_IP:8082/"
     
     echo
-    log_info "Observability Stack:"
-    echo "Elasticsearch: http://$OBSERVABILITY_IP:9200/"
-    echo "Kibana:        http://$OBSERVABILITY_IP:5601/"
-    echo "Grafana:       http://$OBSERVABILITY_IP:3000/"
-    echo "Prometheus:    http://$OBSERVABILITY_IP:9090/"
-    echo "Alertmanager:  http://$OBSERVABILITY_IP:9093/"
+    # Observability stack intentionally omitted in minimal deployment
 }
 
 stop_services() {

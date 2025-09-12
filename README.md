@@ -1,6 +1,6 @@
 # Network Management Suite
 
-A comprehensive network management and automation platform that integrates **NetBox**, **Nautobot**, **Jenkins**, **Oxidized**, and **Filebeat** with your existing observability stack. This suite provides network documentation, automation, configuration management, and centralized logging.
+Minimal deployment: This repository is now focused on a streamlined stack that deploys only **NetBox** and **Nautobot** (plus required Postgres/Redis and worker processes) to get you to a working network automation baseline quickly. Optional components like Jenkins, Oxidized, Filebeat, pgAdmin, and Redis Commander are not included in the default compose.
 
 ## 🏗️ Architecture
 

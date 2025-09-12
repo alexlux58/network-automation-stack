@@ -12,9 +12,7 @@ volumes:
   netbox-media: {}
   pgdata-nautobot: {}
   nautobot-media: {}
-  pgadmin-data: {}
-  oxidized-data: {}
-  jenkins-home: {}
+  
 
 services:
   postgres-netbox:
@@ -196,6 +194,7 @@ services:
       NAUTOBOT_REDIS_PORT: 6379
       NAUTOBOT_REDIS_DATABASE: 0
       NAUTOBOT_SECRET_KEY: ${NAUTOBOT_SECRET_KEY}
+      NAUTOBOT_ALLOWED_HOSTS: ${NAUTOBOT_ALLOWED_HOSTS}
     ports:
       - "8081:8080"
     volumes:
@@ -241,111 +240,8 @@ services:
       NAUTOBOT_REDIS_PORT: 6379
       NAUTOBOT_REDIS_DATABASE: 0
       NAUTOBOT_SECRET_KEY: ${NAUTOBOT_SECRET_KEY}
-    command: ["nautobot-server", "rqworker"]
+      NAUTOBOT_ALLOWED_HOSTS: ${NAUTOBOT_ALLOWED_HOSTS}
+    command: ["nautobot-server", "celery", "worker"]
     labels:
       co.elastic.logs/enabled: "true"
-    networks: [netmgmt]
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    restart: unless-stopped
-    depends_on:
-      - postgres-netbox
-      - postgres-nautobot
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    ports:
-      - "5050:80"
-    networks: [netmgmt]
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
-
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    restart: unless-stopped
-    environment:
-      REDIS_HOSTS: "netbox:redis-netbox:6379,nautobot:redis-nautobot:6379"
-    ports:
-      - "8082:8081"
-    networks: [netmgmt]
-
-  jenkins:
-    image: jenkins/jenkins:lts
-    restart: unless-stopped
-    ports:
-      - "8090:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins-home:/var/jenkins_home
-    networks: [netmgmt]
-    labels:
-      co.elastic.logs/enabled: "true"
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8080"
-      prometheus.io/path: "/prometheus"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login >/dev/null || exit 1"]
-    deploy:
-      resources:
-        limits:
-          memory: 3G
-          cpus: '1.0'
-        reservations:
-          memory: 1G
-          cpus: '0.5'
-
-  oxidized:
-    image: oxidized/oxidized:latest
-    restart: unless-stopped
-    environment:
-      CONFIG_RELOAD_INTERVAL: "600"
-    volumes:
-      - oxidized-data:/home/oxidized/.config/oxidized
-    ports:
-      - "8888:8888"
-    networks: [netmgmt]
-    labels:
-      co.elastic.logs/enabled: "true"
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-      prometheus.io/path: "/metrics"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8888 >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - seccomp:unconfined
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:8.15.0
-    restart: unless-stopped
-    user: root
-    depends_on:
-      - netbox
-      - nautobot
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./beats/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
     networks: [netmgmt]

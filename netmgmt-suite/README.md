@@ -1,5 +1,7 @@
 # Network Management Suite
 
+Note: This project now deploys a minimal stack (NetBox + Nautobot with their required Postgres and Redis backends and worker services). Optional services such as Jenkins, pgAdmin, Redis Commander, Oxidized, and Filebeat have been removed from the default deployment to simplify initial setup.
+
 A comprehensive network management and automation platform that integrates **NetBox**, **Nautobot**, **Jenkins**, **Oxidized**, **pgAdmin**, **Redis Commander**, and **Filebeat** with your existing observability stack. This suite provides network documentation, automation, configuration management, and centralized logging.
 
 ## 🎉 **CURRENT STATUS: FULLY OPERATIONAL**
